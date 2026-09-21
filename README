@@ -17,6 +17,8 @@ Projeto desenvolvido em C++ para simular um sistema cliente-servidor utilizando:
 ├── banco.txt
 ├── Makefile
 └── README.md
+
+```
 Requisitos
 
 É necessário ter instalado:

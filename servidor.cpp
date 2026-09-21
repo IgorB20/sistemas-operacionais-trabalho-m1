@@ -19,19 +19,6 @@ typedef struct
 
 pthread_mutex_t bancoMutex = PTHREAD_MUTEX_INITIALIZER;
 
-/*
-int getIdFromSelectQuery(const string& query) {
-    regex pattern(R"(^select \* from users where id=([0-9]+)$)");
-
-    smatch match;
-
-    if (!regex_match(query, match, pattern)) {
-        return -1;
-    }
-
-    return stoi(match[1].str());
-}*/
-
 int getIdFromQuery(const string &query)
 {
     regex selectPattern(
@@ -485,11 +472,6 @@ Registro deleteQuery(string query)
         throw "Registro nao encontrado";
     }
 }
-
-struct ThreadArgs
-{
-    string command;
-};
 
 void *processarRequisicao(void *args)
 {

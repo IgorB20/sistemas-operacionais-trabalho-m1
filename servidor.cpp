@@ -18,6 +18,9 @@ typedef struct
 } Registro;
 
 pthread_mutex_t bancoMutex = PTHREAD_MUTEX_INITIALIZER;
+vector<string> filaRequisicoes;
+pthread_mutex_t filaMutex = PTHREAD_MUTEX_INITIALIZER;
+sem_t *sem_fila;
 
 int getIdFromQuery(const string &query)
 {
@@ -537,40 +540,25 @@ void *processarRequisicao(void *args)
     return nullptr;
 }
 
-string pegarProximaRequisicao(vector<string> &fila)
+void *worker(void *arg)
 {
-    string query = fila.front();
-    fila.erase(fila.begin());
-
-    return query;
-}
-
-void processarFila(vector<string> &fila)
-{
-    pthread_t threads[2];
-
-    int quantidade = 0;
-
-    while (!fila.empty() && quantidade < 2)
+    while (true)
     {
+        sem_wait(sem_fila);
 
-        string query = pegarProximaRequisicao(fila);
+        pthread_mutex_lock(&filaMutex);
+
+        string query = filaRequisicoes.front();
+        filaRequisicoes.erase(filaRequisicoes.begin());
+
+        pthread_mutex_unlock(&filaMutex);
 
         string *queryThread = new string(query);
 
-        pthread_create(
-            &threads[quantidade],
-            nullptr,
-            processarRequisicao,
-            queryThread);
-
-        quantidade++;
+        processarRequisicao(queryThread);
     }
 
-    for (int i = 0; i < quantidade; i++)
-    {
-        pthread_join(threads[i], nullptr);
-    }
+    return nullptr;
 }
 
 int main()
@@ -585,25 +573,41 @@ int main()
         0666,
         0);
 
-    vector<string> filaRequisicoes;
+    sem_fila = sem_open(
+        "/sem_fila",
+        O_CREAT,
+        0666,
+        0);
+
+    pthread_t t1;
+    pthread_t t2;
+
+    pthread_create(&t1, nullptr, worker, nullptr);
+    pthread_create(&t2, nullptr, worker, nullptr);
 
     while (true)
     {
-
         sem_wait(sem_requisicao);
+
         cout << "Nova requisicao recebida" << endl;
 
         void *ptr_requisicao =
-            abrirMemoriaRequisicao(memoria_requisicao, tamanho);
+            abrirMemoriaRequisicao(
+                memoria_requisicao,
+                tamanho);
 
-        if (ptr_requisicao == nullptr)
-        {
-            return 1;
-        }
+        string command =
+            static_cast<char *>(ptr_requisicao);
 
-        string command = static_cast<char *>(ptr_requisicao);
+        pthread_mutex_lock(&filaMutex);
+
         filaRequisicoes.push_back(command);
-        processarFila(filaRequisicoes);
+
+        pthread_mutex_unlock(&filaMutex);
+
+        sem_post(sem_fila);
+
+        munmap(ptr_requisicao, tamanho);
     }
 
     return 0;
